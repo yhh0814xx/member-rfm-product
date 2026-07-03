@@ -7,13 +7,16 @@ and generates seven visualizations including an algorithm comparison.
 
 Usage
 -----
-    python run_pipeline.py
-    python run_pipeline.py --input data/online_retail_clean.csv --output-dir visualizations/ --k 4
+    python run_pipeline.py --output-root outputs/runs
+    python run_pipeline.py --output-root outputs/runs --run-id test_run
 """
 
 import argparse
 import os
 import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
@@ -25,6 +28,15 @@ import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D  # noqa: F401  (side-effect import)
 
 from src.rfm_pipeline import RFMPipeline
+from src.result_exporter import (
+    build_segment_summary,
+    create_run_directory,
+    export_tables,
+    relative_manifest,
+    runtime_versions,
+    sha256_file,
+    write_metadata,
+)
 
 
 # ======================================================================
@@ -41,9 +53,14 @@ def parse_args(argv=None):
         help="Path to the cleaned transaction CSV (default: data/online_retail_clean.csv)",
     )
     parser.add_argument(
-        "--output-dir",
-        default="visualizations/",
-        help="Directory for output PNGs (default: visualizations/)",
+        "--output-root",
+        default="outputs/runs",
+        help="Root directory for isolated runs (default: outputs/runs)",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Optional unique run identifier; existing run directories are never overwritten",
     )
     parser.add_argument(
         "--k",
@@ -819,18 +836,26 @@ def main(argv=None):
     args = parse_args(argv)
 
     # ---- Setup ----
-    os.makedirs(args.output_dir, exist_ok=True)
+    started_at = datetime.now(timezone.utc)
+    started_timer = time.perf_counter()
+    input_path = Path(args.input).expanduser().resolve()
+    if not input_path.is_file():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    input_sha256 = sha256_file(input_path)
+    run_paths = create_run_directory(args.output_root, args.run_id)
+
     print("=" * 60)
     print("RFM CUSTOMER SEGMENTATION PIPELINE")
     print("=" * 60)
-    print(f"Input file:   {args.input}")
-    print(f"Output dir:   {args.output_dir}")
+    print(f"Input file:   {input_path}")
+    print(f"Run ID:       {run_paths.run_id}")
+    print(f"Run dir:      {run_paths.root}")
     print(f"K-Means K:    {args.k}")
     print()
 
     # ---- Step 1: Load data ----
     print("[1/5] Loading data ...")
-    df = pd.read_csv(args.input)
+    df = pd.read_csv(input_path)
     df["InvoiceDate"] = pd.to_datetime(df["InvoiceDate"])
     print(f"  Loaded {len(df):,} rows, {df['CustomerID'].nunique():,} unique customers")
     print()
@@ -932,18 +957,72 @@ def main(argv=None):
 
     # ---- Step 5: Generate all 7 visualizations ----
     print("[5/6] Generating visualizations ...")
-    plot_segment_overview(rfm, args.output_dir)
-    plot_executive_summary(rfm, args.output_dir)
-    plot_3d_scatter(rfm, args.output_dir)
-    plot_action_cards(rfm, args.output_dir)
-    plot_elbow_method(elbow_df, args.k, args.output_dir)
-    plot_kmeans_comparison(rfm, args.output_dir)
-    plot_algorithm_comparison(comparison_df, hopkins_log, hopkins_yj, args.output_dir)
+    visualization_dir = str(run_paths.visualizations)
+    plot_segment_overview(rfm, visualization_dir)
+    plot_executive_summary(rfm, visualization_dir)
+    plot_3d_scatter(rfm, visualization_dir)
+    plot_action_cards(rfm, visualization_dir)
+    plot_elbow_method(elbow_df, args.k, visualization_dir)
+    plot_kmeans_comparison(rfm, visualization_dir)
+    plot_algorithm_comparison(comparison_df, hopkins_log, hopkins_yj, visualization_dir)
+
+    # ---- Step 6: Export tables and metadata ----
+    print("[6/6] Exporting tables and run metadata ...")
+    export_summary = build_segment_summary(rfm)
+    table_files = export_tables(
+        run_paths,
+        rfm,
+        export_summary,
+        elbow_df,
+        comparison_df,
+    )
+    image_files = sorted(run_paths.visualizations.glob("*.png"))
+    if len(image_files) != 7:
+        raise RuntimeError(f"Expected 7 visualization files, found {len(image_files)}")
+
+    completed_at = datetime.now(timezone.utc)
+    duration_seconds = time.perf_counter() - started_timer
+    metadata_path = run_paths.metadata / "run_metadata.json"
+    output_files = [*table_files, *image_files, metadata_path]
+    metadata_payload = {
+        "run_id": run_paths.run_id,
+        "started_at_utc": started_at.isoformat(),
+        "completed_at_utc": completed_at.isoformat(),
+        "duration_seconds": duration_seconds,
+        "input": {
+            "path": str(input_path),
+            "sha256": input_sha256,
+            "rows": int(len(df)),
+            "customers": int(df["CustomerID"].nunique(dropna=True)),
+            "orders": int(df["InvoiceNo"].nunique(dropna=True)),
+            "date_min": df["InvoiceDate"].min().isoformat(),
+            "date_max": df["InvoiceDate"].max().isoformat(),
+        },
+        "parameters": {
+            "input": args.input,
+            "output_root": str(Path(args.output_root).expanduser().resolve()),
+            "run_id": run_paths.run_id,
+            "k": args.k,
+        },
+        "runtime": runtime_versions(),
+        "results": {
+            "rfm_customers": int(len(rfm)),
+            "segments": int(rfm["Segment"].nunique()),
+            "kmeans_metrics": metrics,
+            "hopkins_log": hopkins_log,
+            "hopkins_yeo_johnson": hopkins_yj,
+            "algorithm_comparison_rows": int(len(comparison_df)),
+        },
+        "output_files": relative_manifest(run_paths.root, output_files),
+    }
+    write_metadata(run_paths, metadata_payload)
 
     print()
     print("=" * 60)
-    print(f"Pipeline complete. 7 visualizations saved to {args.output_dir}")
+    print(f"Pipeline complete. Results saved to {run_paths.root}")
+    print(f"Duration: {duration_seconds:.3f} seconds")
     print("=" * 60)
+    return run_paths
 
 
 if __name__ == "__main__":

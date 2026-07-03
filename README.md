@@ -3,7 +3,7 @@
 > **Language:** English | [Deutsch](README.de.md)
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-61%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/badge/tests-71%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![Coverage](https://raw.githubusercontent.com/leelesemann-sys/rfm-customer-segmentation/main/.github/badges/coverage.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![CI](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml/badge.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -31,7 +31,7 @@ Most RFM analyses on this dataset stop at K-Means with default settings. This pr
 2. **Preprocessing comparison** — log-transform vs Yeo-Johnson power transform
 3. **Statistical validation** — Hopkins statistic (0.956) proves data is clusterable *before* running algorithms
 4. **Production-ready code** — Reusable `RFMPipeline` class, not just a notebook
-5. **Tested and automated** — 61 unit tests, GitHub Actions CI across Python 3.10-3.12
+5. **Tested and automated** — 71 tests (61 upstream + 10 product-output tests)
 6. **Iterative development** — [v1.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v1.0) baseline, then [v2.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v2.0) with multi-algorithm comparison via [documented PR](https://github.com/leelesemann-sys/rfm-customer-segmentation/pull/1)
 
 ---
@@ -43,9 +43,33 @@ git clone https://github.com/leelesemann-sys/rfm-customer-segmentation.git
 cd rfm-customer-segmentation
 pip install -r requirements.txt
 
-python run_pipeline.py                    # Run full pipeline with defaults
-python run_pipeline.py --k 5             # Try different cluster counts
+python run_pipeline.py --output-root outputs/runs
+python run_pipeline.py --output-root outputs/runs --run-id test_run
+python run_pipeline.py --output-root outputs/runs --k 5
 ```
+
+---
+
+## Isolated Run Outputs
+
+Each pipeline execution creates a new immutable run directory. If a requested
+`run_id` already exists, the command fails instead of overwriting prior results.
+
+```text
+outputs/runs/<run_id>/
+├── tables/
+│   ├── rfm_customers.csv
+│   ├── segment_summary.csv
+│   ├── kmeans_evaluation.csv
+│   └── algorithm_comparison.csv
+├── visualizations/
+│   └── 7 PNG dashboards
+└── metadata/
+    └── run_metadata.json
+```
+
+The tracked `visualizations/` directory remains the upstream example gallery;
+normal pipeline runs no longer write to it.
 
 ---
 
@@ -121,7 +145,7 @@ Raw Data (541k rows)
 | Data | pandas, numpy |
 | ML | scikit-learn (K-Means, GMM, Hopkins, Yeo-Johnson) |
 | Visualization | matplotlib, seaborn |
-| Testing | pytest (61 tests), pytest-cov |
+| Testing | pytest (71 tests: 61 upstream + 10 product-output tests) |
 | CI/CD | GitHub Actions (Python 3.10, 3.11, 3.12) |
 
 ---
@@ -132,14 +156,18 @@ Raw Data (541k rows)
 rfm-customer-segmentation/
 ├── src/
 │   ├── __init__.py
-│   └── rfm_pipeline.py               # Reusable pipeline class (K-Means, GMM, Hopkins)
+│   ├── rfm_pipeline.py               # Reusable pipeline class (K-Means, GMM, Hopkins)
+│   └── result_exporter.py            # Isolated run directories and CSV/JSON exports
 ├── notebooks/
 │   ├── 01_data_exploration.ipynb      # EDA & data cleaning
 │   └── 02_rfm_analysis.ipynb         # RFM scoring & clustering
 ├── tests/
 │   ├── conftest.py                    # Shared test fixtures (50 synthetic customers)
-│   └── test_pipeline.py              # 61 unit tests across 10 test classes
+│   ├── test_pipeline.py               # 61 upstream unit tests
+│   ├── test_result_exporter.py        # Isolated directory and export tests
+│   └── test_run_pipeline_outputs.py   # Full output-isolation integration test
 ├── visualizations/                    # 7 publication-ready PNGs
+├── outputs/runs/                       # Ignored, isolated runtime outputs
 ├── data/
 │   └── online_retail_clean.csv.zip   # Cleaned dataset (394k transactions)
 ├── run_pipeline.py                    # CLI entrypoint (full pipeline + all visualizations)

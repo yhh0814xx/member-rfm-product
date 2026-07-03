@@ -208,3 +208,6 @@ __marimo__/
 
 # Unzipped data files (keep only .csv.zip)
 data/online_retail_clean.csv
+
+# Isolated pipeline run artifacts
+/outputs/runs/
