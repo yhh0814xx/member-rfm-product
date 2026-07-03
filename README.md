@@ -48,6 +48,28 @@ python run_pipeline.py --output-root outputs/runs --run-id test_run
 python run_pipeline.py --output-root outputs/runs --k 5
 ```
 
+### 中文 Streamlit 看板
+
+看板只读取本项目 `outputs/runs/<run_id>/` 下已经导出的结果，不会重新计算
+RFM、修改分层规则，也不依赖参考项目、模拟数据或其他虚拟环境。它会默认选择
+最近更新的 run，并支持切换 run、Segment 筛选、CustomerID 查询、K-Means 与
+算法比较、7 张分析图片以及 CSV/JSON 下载。
+
+```powershell
+.venv\Scripts\python run_dashboard.py
+```
+
+也可直接启动：
+
+```powershell
+.venv\Scripts\python -m streamlit run app/app.py
+```
+
+未发现运行结果、文件缺失或字段格式错误时，页面会显示中文修复提示。界面布局
+与交互方式参考 Amir 的 MIT 许可项目
+[Data-Storytelling-Dashboard](https://github.com/AmirhosseinHonardoust/Data-Storytelling-Dashboard)；
+完整归属说明、参考文件映射及许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
 ---
 
 ## Isolated Run Outputs

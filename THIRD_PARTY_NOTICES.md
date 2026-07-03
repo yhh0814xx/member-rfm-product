@@ -1,0 +1,39 @@
+# Third-Party Notices
+
+## Data-Storytelling-Dashboard
+
+- Repository: https://github.com/AmirhosseinHonardoust/Data-Storytelling-Dashboard
+- Author and copyright holder: Amir
+- License: MIT License
+- Reference files: `app/app.py` and `app/utils/data_utils.py`
+- Files adapted in this project: `app/app.py`
+
+This project's `app/app.py` adapts the reference dashboard's high-level
+Streamlit presentation pattern: wide page layout, sidebar controls, KPI metric
+columns, two-column chart/table sections, download buttons, and a footer source
+note. All labels and application logic were rewritten for this project's
+exported RFM artifacts. No synthetic dataset, RFM implementation, cohort logic,
+or runtime dependency on the reference repository is included. The loader and
+validation code in `app/dashboard_data.py` is original to this project.
+
+### MIT License
+
+Copyright (c) 2025 Amir
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
