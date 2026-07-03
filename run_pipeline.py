@@ -32,6 +32,7 @@ from src.result_exporter import (
     build_segment_summary,
     create_run_directory,
     export_tables,
+    export_transaction_tables,
     relative_manifest,
     runtime_versions,
     sha256_file,
@@ -976,6 +977,7 @@ def main(argv=None):
         elbow_df,
         comparison_df,
     )
+    table_files.extend(export_transaction_tables(run_paths, df))
     image_files = sorted(run_paths.visualizations.glob("*.png"))
     if len(image_files) != 7:
         raise RuntimeError(f"Expected 7 visualization files, found {len(image_files)}")

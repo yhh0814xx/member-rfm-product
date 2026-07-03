@@ -83,7 +83,12 @@ outputs/runs/<run_id>/
 │   ├── rfm_customers.csv
 │   ├── segment_summary.csv
 │   ├── kmeans_evaluation.csv
-│   └── algorithm_comparison.csv
+│   ├── algorithm_comparison.csv
+│   ├── transaction_clean.csv
+│   ├── monthly_summary.csv
+│   ├── country_summary.csv
+│   ├── product_summary.csv
+│   └── cohort_retention.csv
 ├── visualizations/
 │   └── 7 PNG dashboards
 └── metadata/
@@ -92,6 +97,13 @@ outputs/runs/<run_id>/
 
 The tracked `visualizations/` directory remains the upstream example gallery;
 normal pipeline runs no longer write to it.
+
+`transaction_clean.csv` is a snapshot of the already-cleaned input supplied to
+that run; this export stage does not run data cleaning again. The monthly,
+country, and product tables are derived from its real transaction fields and
+reconcile to the same total `TotalAmount`. Products are grouped jointly by
+`StockCode` and `Description`. Cohort retention uses unique customers, assigns
+each customer to their first purchase month, and starts at period 0 (100%).
 
 ---
 
