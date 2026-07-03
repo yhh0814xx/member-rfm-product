@@ -52,13 +52,22 @@ python run_pipeline.py --output-root outputs/runs --k 5
 
 看板只读取本项目 `outputs/runs/<run_id>/` 下已经导出的结果，不会重新计算
 RFM、修改分层规则，也不依赖参考项目、模拟数据或其他虚拟环境。它会默认选择
-最近更新的 run，并以八个标签页展示经营总览、月度趋势、国家分析、商品分析、
-Cohort 留存、分页交易明细、RFM 与聚类以及下载中心。日期、国家和商品筛选同步
+最近更新的 run，并以标签页展示数据上传与分析、经营总览、月度趋势、国家分析、
+商品分析、Cohort 留存、分页交易明细、RFM 与聚类以及下载中心。日期、国家和商品筛选同步
 影响交易 KPI、趋势、排行和明细；Cohort 热力图严格使用导出的真实留存表，缺失
 期保持为空。RFM Segment、CustomerID 查询、7 张分析图片和原有下载均予以保留。
 
 `transaction_clean.csv` 使用 Streamlit 数据缓存加载。网页只渲染筛选结果的当前
 分页（每页最多 200 行），而交易 CSV 下载仍包含完整筛选结果。
+
+上传页接受包含标准交易字段的 CSV 或 XLSX 文件。页面会先检查文件大小、行数、
+必需字段、日期、数值、缺失客户、重复行及非正数量/价格，并复用项目现有的
+`RFMPipeline.clean_data()` 计算可处理行数。只有无阻断错误时才开放“一键分析”。
+`InvoiceNo` 以 `C` 开头的记录会按现有规则作为取消订单删除；所有交易日期完全
+相同时会在分析前阻止运行，避免现有 RFM Recency 五分位步骤失败。
+分析通过参数化子进程调用现有 `run_pipeline.py`，先写入被忽略的 staging 目录，
+完整验证后再原子发布到 `outputs/runs/<run_id>/`；失败结果不会进入正式 run，中文
+错误报告保存在被忽略的 `outputs/errors/`。
 
 ```powershell
 .venv\Scripts\python run_dashboard.py

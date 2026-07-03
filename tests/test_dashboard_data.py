@@ -220,6 +220,17 @@ def test_load_run_reports_bad_column_in_chinese(tmp_path):
         load_run(run_dir)
 
 
+def test_load_run_rejects_unsafe_image_dimensions(tmp_path):
+    run_dir = make_run(tmp_path)
+    image = run_dir / "visualizations" / IMAGE_FILES[0]
+    header = bytearray(image.read_bytes()[:24])
+    header[16:20] = (200_000).to_bytes(4, "big")
+    header[20:24] = (200_000).to_bytes(4, "big")
+    image.write_bytes(bytes(header))
+    with pytest.raises(RunDataError, match="图片像素过大"):
+        load_run(run_dir)
+
+
 def test_transaction_tables_kpis_filters_and_monthly_summary(tmp_path):
     transaction_bundle = load_transaction_tables(make_run(tmp_path))
     assert compute_transaction_kpis(transaction_bundle.transactions) == {

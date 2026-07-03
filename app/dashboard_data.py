@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -80,6 +81,7 @@ IMAGE_FILES = (
     "6_kmeans_final_comparison.png",
     "7_algorithm_comparison.png",
 )
+MAX_IMAGE_PIXELS = 100_000_000
 
 TRANSACTION_TABLE_SPECS: dict[str, tuple[str, ...]] = {
     "transaction_clean.csv": (
@@ -230,6 +232,23 @@ def _read_metadata(run_dir: Path) -> tuple[dict[str, Any], bytes]:
     return metadata, raw
 
 
+def _validate_png(path: Path) -> None:
+    """Reject corrupt or abnormally large PNG output before Streamlit renders it."""
+    try:
+        header = path.read_bytes()[:24]
+        if len(header) < 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+            raise ValueError("不是有效的PNG文件")
+        width, height = struct.unpack(">II", header[16:24])
+        if width <= 0 or height <= 0:
+            raise ValueError("图片尺寸无效")
+        if width * height > MAX_IMAGE_PIXELS:
+            raise ValueError(
+                f"图片像素过大（{width}×{height}），无法安全展示"
+            )
+    except (OSError, ValueError, struct.error) as exc:
+        raise RunDataError(f"分析图片格式错误：visualizations/{path.name}：{exc}") from exc
+
+
 def load_run(run_dir: Path) -> RunBundle:
     """Load one run after validating every dashboard artifact."""
     run_dir = Path(run_dir)
@@ -243,6 +262,8 @@ def load_run(run_dir: Path) -> RunBundle:
     missing_images = [f"visualizations/{path.name}" for path in images if not path.is_file()]
     if missing_images:
         raise RunDataError(f"运行结果缺少文件：{', '.join(missing_images)}")
+    for image in images:
+        _validate_png(image)
 
     return RunBundle(
         run_id=run_dir.name,

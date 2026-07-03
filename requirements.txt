@@ -6,3 +6,4 @@ seaborn>=0.12
 pytest>=7.0
 streamlit>=1.38
 plotly>=5.23
+openpyxl>=3.1

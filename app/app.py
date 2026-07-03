@@ -2,45 +2,37 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 import os
+import sys
 from pathlib import Path
 
 import plotly.express as px
 import streamlit as st
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-try:
-    from app.dashboard_data import (
-        RunDataError,
-        compute_kpis,
-        compute_transaction_kpis,
-        dataframe_to_csv_bytes,
-        discover_runs,
-        filter_customers,
-        filter_transactions,
-        load_run,
-        load_transaction_tables,
-        product_key,
-        summarize_filtered_countries,
-        summarize_filtered_monthly,
-        summarize_filtered_products,
-    )
-except ModuleNotFoundError:  # ``streamlit run app/app.py`` execution path
-    from dashboard_data import (  # type: ignore[no-redef]
-        RunDataError,
-        compute_kpis,
-        compute_transaction_kpis,
-        dataframe_to_csv_bytes,
-        discover_runs,
-        filter_customers,
-        filter_transactions,
-        load_run,
-        load_transaction_tables,
-        product_key,
-        summarize_filtered_countries,
-        summarize_filtered_monthly,
-        summarize_filtered_products,
-    )
+from .dashboard_data import (
+    RunDataError,
+    compute_kpis,
+    compute_transaction_kpis,
+    dataframe_to_csv_bytes,
+    discover_runs,
+    filter_customers,
+    filter_transactions,
+    load_run,
+    load_transaction_tables,
+    product_key,
+    summarize_filtered_countries,
+    summarize_filtered_monthly,
+    summarize_filtered_products,
+)
+from .upload_analysis import (
+    AnalysisExecutionError,
+    generate_upload_run_id,
+    run_uploaded_analysis,
+    validate_upload,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -60,15 +52,31 @@ def cached_load_transaction_tables(run_path: str, modified_ns: int):
     return load_transaction_tables(Path(run_path))
 
 
-_main_invoked = False
+@st.cache_data(show_spinner=False)
+def cached_validate_upload(filename: str, content: bytes):
+    """Cache validation by filename and file content hash."""
+    return validate_upload(filename, content)
+
+
+_RENDER_MARKER = "__member_rfm_dashboard_rendered__"
+_bare_main_invoked = False
 
 
 def main():
-    """Render the dashboard once per module execution."""
-    global _main_invoked
-    if _main_invoked:
-        return
-    _main_invoked = True
+    """Render once per Streamlit run while allowing normal reruns."""
+    global _bare_main_invoked, RUNS_ROOT
+    context = get_script_run_ctx(suppress_warning=True)
+    if context is None:
+        if _bare_main_invoked:
+            return
+        _bare_main_invoked = True
+    else:
+        if not context.widget_user_keys_this_run.check_and_add(_RENDER_MARKER):
+            return
+
+    RUNS_ROOT = Path(
+        os.environ.get("RFM_RUNS_ROOT", PROJECT_ROOT / "outputs" / "runs")
+    )
 
     st.set_page_config(page_title="会员与交易分析", page_icon="📊", layout="wide")
     st.title("会员与交易分析看板")
@@ -87,6 +95,9 @@ def main():
         st.stop()
 
     run_by_id = {path.name: path for path in run_dirs}
+    pending_run_id = st.session_state.pop("_pending_run_id", None)
+    if pending_run_id in run_by_id:
+        st.session_state["run_id_selector"] = pending_run_id
     st.sidebar.header("结果与全局筛选")
     selected_run_id = st.sidebar.selectbox(
         "选择 run_id",
@@ -175,6 +186,7 @@ def main():
         st.sidebar.caption(f"完成时间（UTC）：{completed_at}")
 
     tab_names = [
+        "数据上传与分析",
         "经营总览",
         "月度趋势",
         "国家分析",
@@ -185,6 +197,7 @@ def main():
         "下载中心",
     ]
     (
+        upload_tab,
         overview_tab,
         monthly_tab,
         country_tab,
@@ -194,6 +207,106 @@ def main():
         rfm_tab,
         download_tab,
     ) = st.tabs(tab_names)
+
+    with upload_tab:
+        st.subheader("数据上传、校验与一键分析")
+        st.caption(
+            "支持CSV和XLSX。上传后仅执行校验；确认通过并点击按钮后，才会运行现有pipeline。"
+        )
+        st.info(
+            "数据规则提示：InvoiceNo以C开头会按取消订单删除；如果所有交易日期完全相同，"
+            "系统会在分析前阻止运行，因为无法计算有效的RFM Recency五分位。"
+        )
+        uploaded_file = st.file_uploader(
+            "上传会员交易文件",
+            type=["csv", "xlsx"],
+            accept_multiple_files=False,
+            key="transaction_upload_file",
+        )
+        if uploaded_file is None:
+            st.info("请选择CSV或XLSX文件开始校验。")
+        else:
+            content = uploaded_file.getvalue()
+            with st.status("校验中……", expanded=True) as validation_status:
+                validation = cached_validate_upload(uploaded_file.name, content)
+                if validation.can_analyze:
+                    validation_status.update(
+                        label="校验完成，可以开始分析", state="complete"
+                    )
+                else:
+                    validation_status.update(
+                        label="校验完成，存在阻断性错误", state="error"
+                    )
+
+            metrics = st.columns(4)
+            metrics[0].metric("文件大小", f"{validation.file_size / 1024 / 1024:.2f} MiB")
+            metrics[1].metric("文件行数", f"{validation.total_rows:,}")
+            metrics[2].metric("可处理行数", f"{validation.processable_rows:,}")
+            metrics[3].metric("可处理客户", f"{validation.processable_customers:,}")
+
+            st.markdown("##### 数据预览（最多50行）")
+            st.dataframe(validation.preview, width="stretch", hide_index=True)
+            st.markdown("##### 校验结果")
+            for message in validation.errors:
+                st.error(message)
+            for message in validation.warnings:
+                st.warning(message)
+            if validation.can_analyze:
+                st.success("校验通过：允许开始分析。")
+            else:
+                st.error("校验未通过：一键分析按钮已禁用。")
+
+            digest = hashlib.sha256(content).hexdigest()
+            already_analyzed = st.session_state.get("_last_upload_digest") == digest
+            in_progress = bool(st.session_state.get("_analysis_in_progress", False))
+            if already_analyzed:
+                st.info(
+                    f"该文件已生成run_id：{st.session_state.get('_last_upload_run_id')}，"
+                    "为防止重复运行，按钮已禁用。"
+                )
+            start_analysis = st.button(
+                "一键分析",
+                type="primary",
+                disabled=(
+                    not validation.can_analyze or in_progress or already_analyzed
+                ),
+                key="start_uploaded_analysis",
+            )
+            if start_analysis:
+                st.session_state["_analysis_in_progress"] = True
+                selected_upload_run_id = generate_upload_run_id(RUNS_ROOT)
+                with st.status("分析中……", expanded=True) as analysis_status:
+                    analysis_status.write(
+                        f"正在调用现有pipeline，run_id：{selected_upload_run_id}"
+                    )
+                    try:
+                        venv_python = (
+                            Path(sys.prefix) / "Scripts" / "python.exe"
+                            if os.name == "nt"
+                            else Path(sys.prefix) / "bin" / "python"
+                        )
+                        if not venv_python.is_file():
+                            venv_python = Path(sys.executable)
+                        result = run_uploaded_analysis(
+                            validation.cleaned_data,
+                            PROJECT_ROOT,
+                            RUNS_ROOT,
+                            run_id=selected_upload_run_id,
+                            python_executable=venv_python,
+                        )
+                    except AnalysisExecutionError as exc:
+                        analysis_status.update(label="分析失败", state="error")
+                        st.error(str(exc))
+                    else:
+                        analysis_status.update(label="分析完成", state="complete")
+                        st.success(f"分析完成：{result.run_id}")
+                        st.session_state["_last_upload_digest"] = digest
+                        st.session_state["_last_upload_run_id"] = result.run_id
+                        st.session_state["_pending_run_id"] = result.run_id
+                        st.session_state["_analysis_in_progress"] = False
+                        st.rerun()
+                    finally:
+                        st.session_state["_analysis_in_progress"] = False
 
     with overview_tab:
         st.subheader("经营总览")

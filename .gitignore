@@ -211,3 +211,6 @@ data/online_retail_clean.csv
 
 # Isolated pipeline run artifacts
 /outputs/runs/
+/outputs/.staging/
+/outputs/.locks/
+/outputs/errors/
