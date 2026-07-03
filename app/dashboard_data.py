@@ -81,6 +81,71 @@ IMAGE_FILES = (
     "7_algorithm_comparison.png",
 )
 
+TRANSACTION_TABLE_SPECS: dict[str, tuple[str, ...]] = {
+    "transaction_clean.csv": (
+        "InvoiceNo",
+        "StockCode",
+        "Description",
+        "Quantity",
+        "InvoiceDate",
+        "UnitPrice",
+        "CustomerID",
+        "Country",
+        "TotalAmount",
+    ),
+    "monthly_summary.csv": (
+        "Month",
+        "Revenue",
+        "Orders",
+        "Customers",
+        "Quantity",
+        "AverageOrderValue",
+    ),
+    "country_summary.csv": (
+        "Country",
+        "Revenue",
+        "Orders",
+        "Customers",
+        "Quantity",
+        "AverageOrderValue",
+    ),
+    "product_summary.csv": (
+        "StockCode",
+        "Description",
+        "Revenue",
+        "Orders",
+        "Customers",
+        "Quantity",
+    ),
+    "cohort_retention.csv": (
+        "CohortMonth",
+        "Period",
+        "Customers",
+        "CohortSize",
+        "RetentionRate",
+    ),
+}
+
+TRANSACTION_NUMERIC_COLUMNS: dict[str, tuple[str, ...]] = {
+    "transaction_clean.csv": ("Quantity", "UnitPrice", "TotalAmount"),
+    "monthly_summary.csv": (
+        "Revenue",
+        "Orders",
+        "Customers",
+        "Quantity",
+        "AverageOrderValue",
+    ),
+    "country_summary.csv": (
+        "Revenue",
+        "Orders",
+        "Customers",
+        "Quantity",
+        "AverageOrderValue",
+    ),
+    "product_summary.csv": ("Revenue", "Orders", "Customers", "Quantity"),
+    "cohort_retention.csv": ("Period", "Customers", "CohortSize", "RetentionRate"),
+}
+
 
 class RunDataError(ValueError):
     """A selected run cannot safely be displayed."""
@@ -99,6 +164,17 @@ class RunBundle:
     metadata: dict[str, Any]
     metadata_bytes: bytes
     images: tuple[Path, ...]
+
+
+@dataclass(frozen=True)
+class TransactionBundle:
+    """Validated transaction-level artifacts belonging to one pipeline run."""
+
+    transactions: pd.DataFrame
+    monthly_summary: pd.DataFrame
+    country_summary: pd.DataFrame
+    product_summary: pd.DataFrame
+    cohort_retention: pd.DataFrame
 
 
 def discover_runs(output_root: Path) -> list[Path]:
@@ -178,6 +254,167 @@ def load_run(run_dir: Path) -> RunBundle:
         metadata=metadata,
         metadata_bytes=metadata_bytes,
         images=images,
+    )
+
+
+def _read_transaction_table(run_dir: Path, filename: str) -> pd.DataFrame:
+    path = run_dir / "tables" / filename
+    if not path.is_file():
+        raise RunDataError(f"交易分析缺少文件：tables/{filename}")
+    try:
+        dtype = {
+            "CustomerID": "string",
+            "InvoiceNo": "string",
+            "StockCode": "string",
+            "Description": "string",
+            "Country": "string",
+        }
+        frame = pd.read_csv(path, dtype=dtype)
+    except Exception as exc:
+        raise RunDataError(f"无法读取交易分析表 tables/{filename}：{exc}") from exc
+
+    missing = [
+        column
+        for column in TRANSACTION_TABLE_SPECS[filename]
+        if column not in frame.columns
+    ]
+    if missing:
+        raise RunDataError(
+            f"tables/{filename} 格式错误，缺少字段：{', '.join(missing)}"
+        )
+    if frame.empty:
+        raise RunDataError(f"tables/{filename} 没有可展示的数据")
+    for column in TRANSACTION_NUMERIC_COLUMNS[filename]:
+        try:
+            frame[column] = pd.to_numeric(frame[column], errors="raise")
+        except (TypeError, ValueError) as exc:
+            raise RunDataError(
+                f"tables/{filename} 格式错误：字段 {column} 必须为数值"
+            ) from exc
+    return frame
+
+
+def load_transaction_tables(run_dir: Path) -> TransactionBundle:
+    """Load the five transaction exports without affecting core RFM loading."""
+    run_dir = Path(run_dir)
+    tables = {
+        filename: _read_transaction_table(run_dir, filename)
+        for filename in TRANSACTION_TABLE_SPECS
+    }
+    transactions = tables["transaction_clean.csv"]
+    try:
+        transactions["InvoiceDate"] = pd.to_datetime(
+            transactions["InvoiceDate"], errors="raise"
+        )
+    except (TypeError, ValueError) as exc:
+        raise RunDataError(
+            "tables/transaction_clean.csv 格式错误：InvoiceDate 必须为日期"
+        ) from exc
+    return TransactionBundle(
+        transactions=transactions,
+        monthly_summary=tables["monthly_summary.csv"],
+        country_summary=tables["country_summary.csv"],
+        product_summary=tables["product_summary.csv"],
+        cohort_retention=tables["cohort_retention.csv"],
+    )
+
+
+def product_key(frame: pd.DataFrame) -> pd.Series:
+    """Return an unambiguous display key for StockCode + Description."""
+    return frame["StockCode"].astype("string").fillna("") + " | " + frame[
+        "Description"
+    ].astype("string").fillna("")
+
+
+def filter_transactions(
+    transactions: pd.DataFrame,
+    date_range: tuple[Any, Any] | None = None,
+    countries: list[str] | None = None,
+    products: list[str] | None = None,
+    query: str = "",
+) -> pd.DataFrame:
+    """Apply synchronized date, country, product and free-text filters."""
+    mask = pd.Series(True, index=transactions.index)
+    if date_range and len(date_range) == 2:
+        start, end = pd.Timestamp(date_range[0]), pd.Timestamp(date_range[1])
+        mask &= transactions["InvoiceDate"].between(
+            start.normalize(), end.normalize() + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+        )
+    if countries:
+        mask &= transactions["Country"].astype(str).isin(countries)
+    if products:
+        mask &= product_key(transactions).isin(products)
+    text = query.strip()
+    if text:
+        searchable = transactions[
+            ["InvoiceNo", "CustomerID", "StockCode", "Description"]
+        ].astype("string")
+        mask &= searchable.apply(
+            lambda column: column.str.contains(
+                text, case=False, regex=False, na=False
+            )
+        ).any(axis=1)
+    return transactions.loc[mask].copy()
+
+
+def compute_transaction_kpis(transactions: pd.DataFrame) -> dict[str, float | int]:
+    """Compute real transaction KPIs for the synchronized filtered result."""
+    revenue = float(transactions["TotalAmount"].sum())
+    orders = int(transactions["InvoiceNo"].nunique())
+    return {
+        "revenue": revenue,
+        "orders": orders,
+        "customers": int(transactions["CustomerID"].nunique()),
+        "average_order_value": revenue / orders if orders else 0.0,
+        "quantity": float(transactions["Quantity"].sum()),
+    }
+
+
+def summarize_filtered_monthly(transactions: pd.DataFrame) -> pd.DataFrame:
+    """Build synchronized monthly chart data from filtered transactions."""
+    if transactions.empty:
+        return pd.DataFrame(columns=["Month", "Revenue", "Orders", "Customers"])
+    prepared = transactions.assign(
+        Month=transactions["InvoiceDate"].dt.to_period("M").astype(str)
+    )
+    return (
+        prepared.groupby("Month", as_index=False)
+        .agg(
+            Revenue=("TotalAmount", "sum"),
+            Orders=("InvoiceNo", "nunique"),
+            Customers=("CustomerID", "nunique"),
+        )
+        .sort_values("Month")
+    )
+
+
+def summarize_filtered_countries(transactions: pd.DataFrame) -> pd.DataFrame:
+    """Build synchronized country chart data from filtered transactions."""
+    return (
+        transactions.groupby("Country", as_index=False, dropna=False)
+        .agg(
+            Revenue=("TotalAmount", "sum"),
+            Orders=("InvoiceNo", "nunique"),
+            Customers=("CustomerID", "nunique"),
+        )
+        .sort_values("Revenue", ascending=False)
+        .reset_index(drop=True)
+    )
+
+
+def summarize_filtered_products(transactions: pd.DataFrame) -> pd.DataFrame:
+    """Build synchronized product chart data using the joint product key."""
+    return (
+        transactions.groupby(
+            ["StockCode", "Description"], as_index=False, dropna=False
+        )
+        .agg(
+            Revenue=("TotalAmount", "sum"),
+            Quantity=("Quantity", "sum"),
+            Orders=("InvoiceNo", "nunique"),
+        )
+        .sort_values("Revenue", ascending=False)
+        .reset_index(drop=True)
     )
 
 
