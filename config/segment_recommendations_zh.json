@@ -1,0 +1,112 @@
+[
+  {
+    "Segment": "Champions",
+    "ChineseName": "冠军客户",
+    "OperationGroup": "重点维护",
+    "PriorityLevel": "高",
+    "CustomerCharacteristics": "近期活跃、购买频率和累计消费表现均突出的核心客户。",
+    "OperationGoal": ["保持高价值客户活跃", "提升交叉购买", "鼓励推荐新客户"],
+    "RecommendationReason": "该群体当前价值与活跃度均较高，运营重点应放在关系维护和价值延展，避免依赖普遍性大额优惠。",
+    "Actions": ["设计分层VIP权益", "提供新品优先体验", "推荐相关商品", "设置推荐奖励", "提供专属服务"],
+    "SuccessMetrics": ["复购率", "购买频率变化", "交叉购买率", "活跃客户留存率"]
+  },
+  {
+    "Segment": "Loyal Customers",
+    "ChineseName": "忠诚客户",
+    "OperationGroup": "重点维护",
+    "PriorityLevel": "高",
+    "CustomerCharacteristics": "持续复购、关系稳定，具备进一步成长为冠军客户的潜力。",
+    "OperationGoal": ["提高购买频率", "提升平均消费金额", "培养为冠军客户"],
+    "RecommendationReason": "该群体已经形成稳定购买关系，适合通过持续权益和关联推荐提升贡献。",
+    "Actions": ["提供积分奖励", "设计会员等级", "推荐组合商品", "发送周期性复购提醒", "开展交叉销售"],
+    "SuccessMetrics": ["复购间隔", "平均消费金额", "购买频率", "升级为冠军客户的比例"]
+  },
+  {
+    "Segment": "Potential Loyalists",
+    "ChineseName": "潜力忠诚客户",
+    "OperationGroup": "成长培育",
+    "PriorityLevel": "中高",
+    "CustomerCharacteristics": "近期有购买行为，购买次数尚不稳定，正处于习惯形成阶段。",
+    "OperationGoal": ["促进第二次或第三次购买", "建立稳定购买习惯"],
+    "RecommendationReason": "该群体近期响应基础较好，及时跟进有助于将单次购买转化为持续关系。",
+    "Actions": ["设计二次购买激励", "推荐相关商品", "发送会员邀请", "开展消费后跟进", "提供个性化内容"],
+    "SuccessMetrics": ["二次购买率", "复购间隔", "购买频率", "转入忠诚客户的比例"]
+  },
+  {
+    "Segment": "New Customers",
+    "ChineseName": "新客户",
+    "OperationGroup": "成长培育",
+    "PriorityLevel": "中高",
+    "CustomerCharacteristics": "刚完成首次购买，对商品、服务和会员体系仍处于了解阶段。",
+    "OperationGoal": ["完成新客承接", "缩短第二次购买间隔"],
+    "RecommendationReason": "首次购买后的体验和沟通会显著影响后续关系，应及时完成服务承接。",
+    "Actions": ["执行欢迎流程", "提供使用说明", "进行首购后推荐", "设计第二单激励", "开展售后关怀"],
+    "SuccessMetrics": ["二次购买率", "首次复购间隔", "售后反馈率", "会员注册率"]
+  },
+  {
+    "Segment": "Promising",
+    "ChineseName": "有潜力客户",
+    "OperationGroup": "成长培育",
+    "PriorityLevel": "中",
+    "CustomerCharacteristics": "已有初步购买信号，但互动和购买深度仍有限。",
+    "OperationGoal": ["判断客户兴趣", "提升互动和购买次数"],
+    "RecommendationReason": "该群体具备成长信号，适合用较低成本验证偏好并观察后续活跃度。",
+    "Actions": ["推荐购买相关商品", "提供低成本权益", "发送新品通知", "开展内容培育", "观察活跃度变化"],
+    "SuccessMetrics": ["内容响应率", "再次购买率", "购买品类数", "转入潜力忠诚客户的比例"]
+  },
+  {
+    "Segment": "Need Attention",
+    "ChineseName": "需要关注客户",
+    "OperationGroup": "流失挽回",
+    "PriorityLevel": "中高",
+    "CustomerCharacteristics": "活跃度开始下降，尚未完全进入流失状态，仍有及时干预空间。",
+    "OperationGoal": ["阻止客户继续流失", "恢复近期活跃"],
+    "RecommendationReason": "该群体正处于状态转弱阶段，及时识别原因通常比完全流失后召回成本更低。",
+    "Actions": ["发送购买周期提醒", "提供个性化推荐", "开展服务满意度回访", "使用小额定向激励", "分析近期消费下降原因"],
+    "SuccessMetrics": ["重新购买率", "触达响应率", "Recency改善", "转入活跃分层的比例"]
+  },
+  {
+    "Segment": "At Risk",
+    "ChineseName": "流失风险客户",
+    "OperationGroup": "流失挽回",
+    "PriorityLevel": "高",
+    "CustomerCharacteristics": "历史购买表现较好，但近期活跃度明显下降。",
+    "OperationGoal": ["召回历史有价值但近期不活跃的客户"],
+    "RecommendationReason": "该群体拥有可验证的历史价值，当前运营重点是识别流失原因并促成重新购买。",
+    "Actions": ["开展定向召回", "根据历史商品推荐", "设计限时回归活动", "进行服务回访", "重点监测是否重新购买"],
+    "SuccessMetrics": ["召回转化率", "重新购买率", "召回后消费金额", "Recency改善"]
+  },
+  {
+    "Segment": "Can't Lose Them",
+    "ChineseName": "不能失去的客户",
+    "OperationGroup": "流失挽回",
+    "PriorityLevel": "最高",
+    "CustomerCharacteristics": "历史购买频率很高，但已经长时间未购买，流失损失可能较大。",
+    "OperationGoal": ["挽回历史高价值客户"],
+    "RecommendationReason": "该群体的历史关系基础较强，应优先人工判断问题，不宜直接对所有客户自动配置高额权益。",
+    "Actions": ["安排人工一对一回访", "提供专属客户服务", "排查投诉或服务问题", "制定个性化回归方案", "进行高优先级跟踪"],
+    "SuccessMetrics": ["人工触达率", "问题解决率", "重新购买率", "挽回客户消费金额"]
+  },
+  {
+    "Segment": "Hibernating",
+    "ChineseName": "沉睡客户",
+    "OperationGroup": "低成本唤醒",
+    "PriorityLevel": "中低",
+    "CustomerCharacteristics": "已有较长时间未活跃，历史购买深度相对有限。",
+    "OperationGoal": ["以可控成本判断是否仍有购买需求"],
+    "RecommendationReason": "该群体规模可能较大但单客价值有限，应通过低成本触达筛选仍有兴趣的客户。",
+    "Actions": ["开展节日活动", "发送新品通知", "进行低成本唤醒", "执行兴趣测试", "根据响应决定是否继续投入"],
+    "SuccessMetrics": ["触达响应率", "重新购买率", "单次召回成本", "无响应客户比例"]
+  },
+  {
+    "Segment": "Lost",
+    "ChineseName": "流失客户",
+    "OperationGroup": "低成本唤醒",
+    "PriorityLevel": "低",
+    "CustomerCharacteristics": "长期未购买且当前活跃度最低，继续投入的回报存在较大不确定性。",
+    "OperationGoal": ["进行最后一次低成本召回", "控制无效营销投入"],
+    "RecommendationReason": "该群体应以投入控制为前提验证最后的召回机会，避免占用高优先级运营资源。",
+    "Actions": ["执行一次低成本召回", "重新确认客户偏好", "无响应后降低触达频率", "不作为高投入运营对象"],
+    "SuccessMetrics": ["最后召回响应率", "重新购买率", "触达成本", "停止无效触达比例"]
+  }
+]

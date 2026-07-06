@@ -33,6 +33,7 @@ from .upload_analysis import (
     run_uploaded_analysis,
     validate_upload,
 )
+from .recommendations_view import render_recommendations
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -194,6 +195,7 @@ def main():
         "Cohort留存",
         "交易明细",
         "RFM与聚类",
+        "会员运营建议",
         "下载中心",
     ]
     (
@@ -205,6 +207,7 @@ def main():
         cohort_tab,
         transaction_tab,
         rfm_tab,
+        recommendations_tab,
         download_tab,
     ) = st.tabs(tab_names)
 
@@ -573,6 +576,9 @@ def main():
             image_columns[index % 2].image(
                 str(image_path), caption=image_path.stem, width="stretch"
             )
+
+    with recommendations_tab:
+        render_recommendations(bundle)
 
     with download_tab:
         st.subheader("下载中心")

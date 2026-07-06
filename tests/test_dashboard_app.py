@@ -34,9 +34,10 @@ def test_dashboard_page_smoke(monkeypatch, tmp_path):
     assert len(run_selectors) == 1
     assert run_selectors[0].value == "smoke_run"
     assert len(titles) == 1
-    assert len(app.tabs) == 9
+    assert len(app.tabs) == 10
     assert any(tab.label == "数据上传与分析" for tab in app.tabs)
-    assert len(app.metric) == 9
+    assert any(tab.label == "会员运营建议" for tab in app.tabs)
+    assert len(app.metric) >= 13
     assert any("筛选结果 4 条" in caption.value for caption in app.caption)
 
     app.run()
@@ -53,7 +54,8 @@ def test_dashboard_missing_transaction_tables_keeps_rfm_available(
     app = AppTest.from_file(str(APP_PATH), default_timeout=15).run()
 
     assert not app.exception
-    assert len(app.metric) == 4
+    assert any(metric.label == "客户数" for metric in app.metric)
+    assert any(metric.label == "run_id" for metric in app.metric)
     assert any("交易分析不可用" in warning.value for warning in app.warning)
 
 
@@ -177,7 +179,7 @@ def test_run_dashboard_real_entry_has_page_without_streamlit_errors(
 
         app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
         assert not app.exception
-        assert len(app.tabs) == 9
+        assert len(app.tabs) == 10
         assert len(app.file_uploader) == 1
         app.run()
         assert not app.exception

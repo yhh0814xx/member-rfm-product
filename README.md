@@ -3,7 +3,7 @@
 > **Language:** English | [Deutsch](README.de.md)
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-71%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/badge/tests-125%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![Coverage](https://raw.githubusercontent.com/leelesemann-sys/rfm-customer-segmentation/main/.github/badges/coverage.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![CI](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml/badge.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -31,7 +31,7 @@ Most RFM analyses on this dataset stop at K-Means with default settings. This pr
 2. **Preprocessing comparison** — log-transform vs Yeo-Johnson power transform
 3. **Statistical validation** — Hopkins statistic (0.956) proves data is clusterable *before* running algorithms
 4. **Production-ready code** — Reusable `RFMPipeline` class, not just a notebook
-5. **Tested and automated** — 71 tests (61 upstream + 10 product-output tests)
+5. **Tested and automated** — 125 tests, including run-scoped dashboard and member-operation recommendations
 6. **Iterative development** — [v1.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v1.0) baseline, then [v2.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v2.0) with multi-algorithm comparison via [documented PR](https://github.com/leelesemann-sys/rfm-customer-segmentation/pull/1)
 
 ---
@@ -53,7 +53,7 @@ python run_pipeline.py --output-root outputs/runs --k 5
 看板只读取本项目 `outputs/runs/<run_id>/` 下已经导出的结果，不会重新计算
 RFM、修改分层规则，也不依赖参考项目、模拟数据或其他虚拟环境。它会默认选择
 最近更新的 run，并以标签页展示数据上传与分析、经营总览、月度趋势、国家分析、
-商品分析、Cohort 留存、分页交易明细、RFM 与聚类以及下载中心。日期、国家和商品筛选同步
+商品分析、Cohort 留存、分页交易明细、RFM 与聚类、会员运营建议以及下载中心。日期、国家和商品筛选同步
 影响交易 KPI、趋势、排行和明细；Cohort 热力图严格使用导出的真实留存表，缺失
 期保持为空。RFM Segment、CustomerID 查询、7 张分析图片和原有下载均予以保留。
 
@@ -68,6 +68,13 @@ RFM、修改分层规则，也不依赖参考项目、模拟数据或其他虚�
 分析通过参数化子进程调用现有 `run_pipeline.py`，先写入被忽略的 staging 目录，
 完整验证后再原子发布到 `outputs/runs/<run_id>/`；失败结果不会进入正式 run，中文
 错误报告保存在被忽略的 `outputs/errors/`。
+
+“会员运营建议”读取当前选择的 `RunBundle`，根据 `rfm_customers.csv` 动态计算
+10类会员的人数、消费金额、占比、平均 Recency 和平均 Frequency，并使用
+`segment_summary.csv` 进行一致性检查。页面提供4类商家运营任务总览、动态优先级、
+10类可展开建议、目标客户筛选，以及分层建议和客户名单CSV下载。策略文案来自
+`config/segment_recommendations_zh.json`；页面不改变流水线输出文件，也不假设货币单位或
+生成项目不存在的CLV指标。
 
 ```powershell
 .venv\Scripts\python run_dashboard.py
@@ -193,7 +200,7 @@ Raw Data (541k rows)
 | Data | pandas, numpy |
 | ML | scikit-learn (K-Means, GMM, Hopkins, Yeo-Johnson) |
 | Visualization | matplotlib, seaborn |
-| Testing | pytest (71 tests: 61 upstream + 10 product-output tests) |
+| Testing | pytest (125 tests) |
 | CI/CD | GitHub Actions (Python 3.10, 3.11, 3.12) |
 
 ---
@@ -205,7 +212,13 @@ rfm-customer-segmentation/
 ├── src/
 │   ├── __init__.py
 │   ├── rfm_pipeline.py               # Reusable pipeline class (K-Means, GMM, Hopkins)
-│   └── result_exporter.py            # Isolated run directories and CSV/JSON exports
+│   ├── result_exporter.py            # Isolated run directories and CSV/JSON exports
+│   ├── segment_recommendations.py    # Ten-segment strategy validation
+│   └── recommendation_adapter.py     # RunBundle recommendation adapter
+├── app/
+│   └── recommendations_view.py       # Member-operation recommendation tab
+├── config/
+│   └── segment_recommendations_zh.json
 ├── notebooks/
 │   ├── 01_data_exploration.ipynb      # EDA & data cleaning
 │   └── 02_rfm_analysis.ipynb         # RFM scoring & clustering
@@ -213,7 +226,10 @@ rfm-customer-segmentation/
 │   ├── conftest.py                    # Shared test fixtures (50 synthetic customers)
 │   ├── test_pipeline.py               # 61 upstream unit tests
 │   ├── test_result_exporter.py        # Isolated directory and export tests
-│   └── test_run_pipeline_outputs.py   # Full output-isolation integration test
+│   ├── test_run_pipeline_outputs.py   # Full output-isolation integration test
+│   ├── test_segment_recommendations.py
+│   ├── test_recommendation_adapter.py
+│   └── test_recommendations_view.py
 ├── visualizations/                    # 7 publication-ready PNGs
 ├── outputs/runs/                       # Ignored, isolated runtime outputs
 ├── data/
