@@ -1,0 +1,53 @@
+{
+  "row_count": 8977,
+  "invoice_count": 3102,
+  "customer_count": 500,
+  "product_count": 80,
+  "country_count": 8,
+  "date_min": "2025-01-01 09:00:00",
+  "date_max": "2025-12-31 20:00:00",
+  "total_quantity": 35249,
+  "total_amount": 808531.52,
+  "country_counts": {
+    "Australia": 827,
+    "Canada": 925,
+    "China": 2372,
+    "France": 621,
+    "Germany": 830,
+    "Malaysia": 1317,
+    "Singapore": 1195,
+    "United Kingdom": 890
+  },
+  "monthly_counts": {
+    "2025-01": 791,
+    "2025-02": 592,
+    "2025-03": 649,
+    "2025-04": 667,
+    "2025-05": 736,
+    "2025-06": 995,
+    "2025-07": 783,
+    "2025-08": 783,
+    "2025-09": 666,
+    "2025-10": 725,
+    "2025-11": 652,
+    "2025-12": 938
+  },
+  "sample_customer_ids": [
+    "M0001",
+    "M0061",
+    "M0151",
+    "M0206",
+    "M0271",
+    "M0331",
+    "M0376",
+    "M0446"
+  ],
+  "sample_products": [
+    "SKU050 | Smart Temperature Sensor",
+    "SKU047 | Mini Air Quality Monitor",
+    "SKU028 | LED Floor Lamp",
+    "SKU060 | Eco Cleaning Sponge Pack",
+    "SKU051 | Microfiber Cleaning Cloth",
+    "SKU034 | A5 Hardcover Notebook"
+  ]
+}
