@@ -9,10 +9,12 @@ import pandas as pd
 
 from .segment_recommendations import (
     GROUP_SEGMENTS,
+    HIGH_PRIORITY_LEVELS,
     OPERATION_GROUPS,
     PRIORITY_RANKS,
     SEGMENTS,
     SegmentStrategy,
+    rank_priority_actions,
 )
 
 
@@ -216,12 +218,16 @@ def build_recommendation_result(
 
     strategy_groups = {segment: strategies[segment].operation_group for segment in SEGMENTS}
     strategy_priorities = {segment: strategies[segment].priority_level for segment in SEGMENTS}
+    strategy_names = {segment: strategies[segment].chinese_name for segment in SEGMENTS}
+    strategy_actions = {segment: strategies[segment].actions[0] for segment in SEGMENTS}
     target_customers = customers.loc[
         customers["Segment"].isin(SEGMENTS),
         ["CustomerID", "Recency", "Frequency", "Monetary", "Segment"],
     ].copy()
-    target_customers["推荐运营任务"] = target_customers["Segment"].map(strategy_groups)
-    target_customers["推荐优先级"] = target_customers["Segment"].map(strategy_priorities)
+    target_customers["ChineseName"] = target_customers["Segment"].map(strategy_names)
+    target_customers["OperationGroup"] = target_customers["Segment"].map(strategy_groups)
+    target_customers["PriorityLevel"] = target_customers["Segment"].map(strategy_priorities)
+    target_customers["RecommendedAction"] = target_customers["Segment"].map(strategy_actions)
 
     resolved_run_id = str(run_id or metadata.get("run_id") or "未提供")
     generated_at = str(
@@ -247,3 +253,68 @@ def recommendation_export_frame(result: RecommendationResult) -> pd.DataFrame:
     frame.insert(0, "run_id", result.run_id)
     frame.insert(1, "generated_at", result.generated_at)
     return frame
+
+
+def high_priority_metrics(result: RecommendationResult) -> tuple[int, float]:
+    """Return high-priority customer count and Monetary contribution."""
+    high = result.recommendations[
+        result.recommendations["PriorityLevel"].isin(HIGH_PRIORITY_LEVELS)
+    ]
+    return int(high["CustomerCount"].sum()), float(high["MonetaryTotal"].sum())
+
+
+def priority_actions_frame(result: RecommendationResult, top_n: int = 3) -> pd.DataFrame:
+    """Return Top N priority segments for the current filtered scope."""
+    return rank_priority_actions(result.recommendations, top_n=top_n).reset_index(drop=True)
+
+
+def value_risk_matrix_frame(result: RecommendationResult) -> pd.DataFrame:
+    """Return the filtered segment-level data used by the value-risk matrix."""
+    columns = [
+        "Segment",
+        "ChineseName",
+        "OperationGroup",
+        "CustomerCount",
+        "MonetaryTotal",
+        "MonetaryShare",
+        "AverageMonetary",
+        "AverageRecency",
+    ]
+    frame = result.recommendations.loc[
+        result.recommendations["SegmentExists"], columns
+    ].copy()
+    return frame.reset_index(drop=True)
+
+
+def target_customer_table(
+    result: RecommendationResult,
+    *,
+    operation_groups: tuple[str, ...] = (),
+    priority_levels: tuple[str, ...] = (),
+    segments: tuple[str, ...] = (),
+    customer_query: str = "",
+    sort_by: str = "Monetary",
+    ascending: bool = False,
+    limit: int | None = 100,
+) -> pd.DataFrame:
+    """Filter, sort and limit the current target-customer table for display/export."""
+    table = result.customers.copy()
+    if operation_groups:
+        table = table[table["OperationGroup"].isin(operation_groups)]
+    if priority_levels:
+        table = table[table["PriorityLevel"].isin(priority_levels)]
+    if segments:
+        table = table[table["Segment"].isin(segments)]
+    query = customer_query.strip()
+    if query:
+        table = table[table["CustomerID"].astype(str).str.contains(query, case=False, na=False)]
+    if sort_by not in {"Monetary", "Recency"}:
+        sort_by = "Monetary"
+    table = table.sort_values(
+        [sort_by, "CustomerID"],
+        ascending=[ascending, True],
+        kind="mergesort",
+    )
+    if limit is not None:
+        table = table.head(limit)
+    return table.reset_index(drop=True)

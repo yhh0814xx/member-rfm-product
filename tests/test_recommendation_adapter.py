@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from io import BytesIO
+
 import pandas as pd
 import pytest
 
 from src.recommendation_adapter import (
     RecommendationDataError,
     build_recommendation_result,
+    high_priority_metrics,
     normalize_customer_id,
+    priority_actions_frame,
     recommendation_export_frame,
+    target_customer_table,
+    value_risk_matrix_frame,
 )
 from src.segment_recommendations import OPERATION_GROUPS, SEGMENTS, load_segment_strategies
 
@@ -65,8 +71,9 @@ def test_each_customer_keeps_one_segment_and_one_operation_group():
     result = build(make_rfm())
     assert result.customers["CustomerID"].is_unique
     assert result.customers["Segment"].isin(SEGMENTS).all()
-    assert result.customers["推荐运营任务"].isin(OPERATION_GROUPS).all()
-    assert result.customers["推荐运营任务"].notna().all()
+    assert result.customers["OperationGroup"].isin(OPERATION_GROUPS).all()
+    assert result.customers["OperationGroup"].notna().all()
+    assert result.customers["RecommendedAction"].str.len().gt(0).all()
 
 
 def test_missing_segment_in_summary_is_recomputed_without_failure():
@@ -148,3 +155,60 @@ def test_empty_rfm_table_produces_zero_metrics_without_failure():
     assert result.recommendations["CustomerCount"].sum() == 0
     assert result.recommendations["MonetaryShare"].sum() == 0
     assert result.customers.empty
+
+
+def test_four_operation_group_cards_have_correct_numbers():
+    result = build(make_rfm())
+    groups = result.group_overview.set_index("OperationGroup")
+    assert groups.loc["重点维护", "CustomerCount"] == 2
+    assert groups.loc["成长培育", "CustomerCount"] == 3
+    assert groups.loc["流失挽回", "CustomerCount"] == 3
+    assert groups.loc["低成本唤醒", "CustomerCount"] == 2
+    assert groups.loc["重点维护", "MonetaryTotal"] == pytest.approx(30.0)
+    assert groups.loc["成长培育", "MonetaryTotal"] == pytest.approx(120.0)
+    assert groups.loc["流失挽回", "MonetaryTotal"] == pytest.approx(210.0)
+    assert groups.loc["低成本唤醒", "MonetaryTotal"] == pytest.approx(190.0)
+
+
+def test_top_three_priority_sort_uses_priority_share_then_count():
+    rfm = make_rfm()
+    result = build(rfm)
+    top = priority_actions_frame(result)
+    assert top["Segment"].tolist() == ["Can't Lose Them", "At Risk", "Loyal Customers"]
+
+
+def test_value_risk_matrix_matches_current_filtered_segments():
+    rfm = make_rfm().query("Segment in ['Champions', 'At Risk']").reset_index(drop=True)
+    result = build(rfm)
+    matrix = value_risk_matrix_frame(result)
+    assert matrix["Segment"].tolist() == ["Champions", "At Risk"]
+    assert matrix["CustomerCount"].tolist() == [1, 1]
+    assert matrix["AverageMonetary"].tolist() == [10.0, 70.0]
+    assert matrix["AverageRecency"].tolist() == [1.0, 7.0]
+
+
+def test_target_customer_table_filters_sorts_and_limits():
+    result = build(make_rfm())
+    table = target_customer_table(
+        result,
+        operation_groups=("流失挽回",),
+        customer_query="100",
+        sort_by="Recency",
+        ascending=False,
+        limit=2,
+    )
+    assert table["Segment"].tolist() == ["Can't Lose Them", "At Risk"]
+    assert table["Recency"].tolist() == [8, 7]
+
+
+def test_target_customer_download_content_matches_current_table():
+    result = build(make_rfm())
+    table = target_customer_table(result, segments=("Champions",), limit=None)
+    downloaded = pd.read_csv(BytesIO(table.to_csv(index=False).encode("utf-8-sig")))
+    assert downloaded["CustomerID"].astype(str).tolist() == ["1000"]
+    assert len(downloaded) == len(table)
+
+
+def test_high_priority_metrics_sync_with_filtered_scope():
+    result = build(make_rfm().query("Segment in ['Champions', 'Lost']").reset_index(drop=True))
+    assert high_priority_metrics(result) == (1, 10.0)

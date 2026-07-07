@@ -1,0 +1,62 @@
+{
+  "Champions": {
+    "ShortMessage": "您好，感谢您近期持续支持我们。看到您最近关注过{last_product}，如果后续使用中有任何问题，我们可以继续协助。",
+    "CareMessage": "您好，想回访一下您对{top_product}相关商品的使用体验，也欢迎告诉我们是否有新的需求方向。",
+    "RecommendedAction": "感谢维护关系，结合{top_product}提供使用建议或相关商品参考。",
+    "AvoidAction": "不要使用大额让利作为主要沟通理由，也不要打扰式高频触达。"
+  },
+  "Loyal Customers": {
+    "ShortMessage": "您好，感谢您一直以来的复购支持。您常关注{top_product}，我们想了解近期使用是否顺利。",
+    "CareMessage": "您好，您已经购买{frequency}次，我们想做一次简单回访，看看后续是否需要补充同类或相关商品信息。",
+    "RecommendedAction": "维护稳定关系，提醒复购周期，提供相关商品和使用建议。",
+    "AvoidAction": "不要把客户当作新客重复介绍基础信息，也不要承诺未确认的权益。"
+  },
+  "Potential Loyalists": {
+    "ShortMessage": "您好，感谢您最近的购买。您上次购买的是{last_product}，想确认使用体验是否符合预期。",
+    "CareMessage": "您好，想了解您对{top_product}相关商品的偏好，后续可以为您提供更匹配的参考。",
+    "RecommendedAction": "推动第二次或第三次购买，围绕最近购买商品做轻量跟进。",
+    "AvoidAction": "不要过早强推长期会员承诺，也不要虚构专属权益。"
+  },
+  "New Customers": {
+    "ShortMessage": "您好，感谢您的首次选择。想确认您在{last_date}购买的{last_product}是否已经顺利收到并开始使用。",
+    "CareMessage": "您好，作为新客户我们想做一次简单回访，了解收货、使用和服务体验是否顺利。",
+    "RecommendedAction": "确认收货和使用情况，解答问题，并在合适时引导第二次购买。",
+    "AvoidAction": "不要立即高频营销，也不要假设客户已经熟悉全部商品和服务。"
+  },
+  "Promising": {
+    "ShortMessage": "您好，看到您之前关注过{last_product}，想了解是否还需要同类商品或使用建议。",
+    "CareMessage": "您好，我们想了解您对{top_product}相关商品的兴趣，便于后续减少无关打扰。",
+    "RecommendedAction": "低成本了解兴趣，观察响应后再决定是否继续投入。",
+    "AvoidAction": "不要投入过重的一对一服务，也不要频繁推送无关商品。"
+  },
+  "Need Attention": {
+    "ShortMessage": "您好，您已经有一段时间没有再次购买。想回访一下之前的{top_product}使用是否顺利。",
+    "CareMessage": "您好，想了解近期没有继续购买是否与商品、服务或使用场景变化有关，我们可以记录并协助处理。",
+    "RecommendedAction": "优先跟进活跃下降原因，结合历史偏好提供帮助和相关商品参考。",
+    "AvoidAction": "不要直接判断客户已经离开，也不要使用夸大式催促。"
+  },
+  "At Risk": {
+    "ShortMessage": "您好，您之前多次购买过{top_product}相关商品，近期较久没有再次购买，想了解是否还有后续需求。",
+    "CareMessage": "您好，想做一次关怀回访，了解之前购买的{last_product}使用情况，以及是否有服务问题需要我们记录。",
+    "RecommendedAction": "关怀召回，结合历史购买兴趣进行推荐，并记录未复购原因。",
+    "AvoidAction": "不要声称系统判断客户即将离开，也不要自动承诺补偿。"
+  },
+  "Can't Lose Them": {
+    "ShortMessage": "您好，您一直是我们非常重视的老客户。想人工回访一下近期使用情况，看看是否有需要我们协助的地方。",
+    "CareMessage": "您好，您之前购买{frequency}次，常关注{top_product}。我们想了解近期没有继续购买是否遇到商品或服务问题。",
+    "RecommendedAction": "安排人工回访，了解使用情况，排查服务问题，并记录下一步跟进计划。",
+    "AvoidAction": "不要群发模板化营销，也不要未经确认就承诺赔付或特殊资源。"
+  },
+  "Hibernating": {
+    "ShortMessage": "您好，较久没有和您联系了。想了解您之前关注的{top_product}是否还有后续使用需求。",
+    "CareMessage": "您好，我们做一次低频回访，确认是否还希望收到{top_product}相关信息。",
+    "RecommendedAction": "低成本唤醒，先确认兴趣和联系方式有效性，再决定是否继续触达。",
+    "AvoidAction": "不要投入高成本人工维护，也不要连续密集触达。"
+  },
+  "Lost": {
+    "ShortMessage": "您好，许久未联系。若您仍关注{top_product}相关商品，可以告诉我们当前需求，我们会尽量提供参考。",
+    "CareMessage": "您好，我们想确认您是否还希望收到相关商品信息；如果暂时不需要，我们会减少打扰。",
+    "RecommendedAction": "进行低优先级触达，确认是否仍有兴趣，无响应则降低触达频率。",
+    "AvoidAction": "不要作为高投入运营对象，也不要反复发送相同内容。"
+  }
+}

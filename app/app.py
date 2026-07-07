@@ -18,14 +18,14 @@ from .dashboard_data import (
     compute_transaction_kpis,
     dataframe_to_csv_bytes,
     discover_runs,
-    filter_customers,
-    filter_transactions,
     load_run,
     load_transaction_tables,
     product_key,
-    summarize_filtered_countries,
-    summarize_filtered_monthly,
-    summarize_filtered_products,
+)
+from .global_filters import (
+    EMPTY_FILTER_MESSAGE,
+    GlobalFilterState,
+    apply_global_filters,
 )
 from .upload_analysis import (
     AnalysisExecutionError,
@@ -61,6 +61,21 @@ def cached_validate_upload(filename: str, content: bytes):
 
 _RENDER_MARKER = "__member_rfm_dashboard_rendered__"
 _bare_main_invoked = False
+
+
+def reset_global_filter_widgets(date_range=None):
+    """Reset display filters without changing the selected run or rerunning analysis."""
+    defaults = {
+        "transaction_country_filter": [],
+        "transaction_product_filter": [],
+        "transaction_query": "",
+        "rfm_segment_filter": [],
+        "rfm_customer_query": "",
+    }
+    if date_range is not None:
+        defaults["transaction_date_filter"] = date_range
+    for key, value in defaults.items():
+        st.session_state[key] = value
 
 
 def main():
@@ -99,7 +114,10 @@ def main():
     pending_run_id = st.session_state.pop("_pending_run_id", None)
     if pending_run_id in run_by_id:
         st.session_state["run_id_selector"] = pending_run_id
-    st.sidebar.header("结果与全局筛选")
+    st.sidebar.header("结果与全局展示筛选")
+    st.sidebar.info(
+        "筛选条件会同步影响所有页面的展示范围，但不会重新计算RFM、会员分层和聚类模型。"
+    )
     selected_run_id = st.sidebar.selectbox(
         "选择 run_id",
         list(run_by_id),
@@ -127,34 +145,35 @@ def main():
     except (RunDataError, OSError) as exc:
         transaction_error = str(exc)
 
-    segment_options = sorted(bundle.rfm_customers["Segment"].dropna().astype(str).unique())
-    selected_segments = st.sidebar.multiselect(
-        "RFM Segment", segment_options, key="rfm_segment_filter"
-    )
-    customer_query = st.sidebar.text_input(
-        "RFM CustomerID",
-        placeholder="输入完整或部分客户ID",
-        key="rfm_customer_query",
-    )
-    filtered_customers = filter_customers(
-        bundle.rfm_customers, selected_segments, customer_query
-    )
-
-    filtered_transactions = None
     selected_date_range = None
     selected_countries: list[str] = []
     selected_products: list[str] = []
     transaction_query = ""
+    full_date_range = None
     if transaction_bundle is not None:
         transactions = transaction_bundle.transactions
         min_date = transactions["InvoiceDate"].min().date()
         max_date = transactions["InvoiceDate"].max().date()
+        full_date_range = (min_date, max_date)
+        date_key = "transaction_date_filter"
+        stored_date_range = st.session_state.get(date_key)
+        date_input_kwargs = {}
+        if date_key not in st.session_state:
+            date_input_kwargs["value"] = full_date_range
+        elif (
+            not isinstance(stored_date_range, (tuple, list))
+            or len(stored_date_range) != 2
+            or stored_date_range[0] < min_date
+            or stored_date_range[1] > max_date
+        ):
+            del st.session_state[date_key]
+            date_input_kwargs["value"] = full_date_range
         selected_date_range = st.sidebar.date_input(
             "交易日期",
-            value=(min_date, max_date),
             min_value=min_date,
             max_value=max_date,
-            key="transaction_date_filter",
+            key=date_key,
+            **date_input_kwargs,
         )
         country_options = sorted(transactions["Country"].dropna().astype(str).unique())
         selected_countries = st.sidebar.multiselect(
@@ -173,13 +192,44 @@ def main():
             placeholder="订单、客户、商品编码或描述",
             key="transaction_query",
         )
-        filtered_transactions = filter_transactions(
-            transactions,
-            tuple(selected_date_range) if len(selected_date_range) == 2 else None,
-            selected_countries,
-            selected_products,
-            transaction_query,
-        )
+
+    segment_options = sorted(bundle.rfm_customers["Segment"].dropna().astype(str).unique())
+    selected_segments = st.sidebar.multiselect(
+        "RFM Segment", segment_options, key="rfm_segment_filter"
+    )
+    customer_query = st.sidebar.text_input(
+        "RFM CustomerID",
+        placeholder="输入完整或部分客户ID",
+        key="rfm_customer_query",
+    )
+    st.sidebar.button(
+        "重置全部筛选",
+        key="reset_global_filters",
+        on_click=reset_global_filter_widgets,
+        args=(full_date_range,),
+    )
+
+    date_range = (
+        tuple(selected_date_range)
+        if isinstance(selected_date_range, (tuple, list))
+        and len(selected_date_range) == 2
+        else None
+    )
+    filter_state = GlobalFilterState(
+        date_range=date_range,
+        countries=tuple(selected_countries),
+        products=tuple(selected_products),
+        transaction_query=transaction_query,
+        segments=tuple(selected_segments),
+        customer_query=customer_query,
+    )
+    global_filters = apply_global_filters(bundle, filter_state, transaction_bundle)
+    filtered_transactions = global_filters.filtered_transactions
+    filtered_customers = global_filters.filtered_rfm_customers
+
+    st.sidebar.markdown("##### 当前筛选摘要")
+    for summary_line in global_filters.active_filter_summary:
+        st.sidebar.caption(summary_line)
 
     st.sidebar.caption(f"当前 run_id：{bundle.run_id}")
     completed_at = bundle.metadata.get("completed_at_utc")
@@ -313,8 +363,10 @@ def main():
 
     with overview_tab:
         st.subheader("经营总览")
-        if filtered_transactions is None:
+        if not global_filters.transaction_available:
             st.warning(f"交易分析不可用：{transaction_error}。RFM与聚类仍可正常使用。")
+        elif filtered_transactions.empty:
+            st.warning(EMPTY_FILTER_MESSAGE)
         else:
             transaction_kpis = compute_transaction_kpis(filtered_transactions)
             columns = st.columns(5)
@@ -327,12 +379,12 @@ def main():
 
     with monthly_tab:
         st.subheader("月度趋势")
-        if filtered_transactions is None:
+        if not global_filters.transaction_available:
             st.info(f"无法展示月度趋势：{transaction_error}")
         else:
-            monthly = summarize_filtered_monthly(filtered_transactions)
+            monthly = global_filters.filtered_monthly_summary
             if monthly.empty:
-                st.info("当前筛选条件下没有月度数据。")
+                st.warning(EMPTY_FILTER_MESSAGE)
             else:
                 st.plotly_chart(
                     px.line(
@@ -365,12 +417,12 @@ def main():
 
     with country_tab:
         st.subheader("国家分析")
-        if filtered_transactions is None:
+        if not global_filters.transaction_available:
             st.info(f"无法展示国家分析：{transaction_error}")
         else:
-            countries = summarize_filtered_countries(filtered_transactions)
+            countries = global_filters.filtered_country_summary
             if countries.empty:
-                st.info("当前筛选条件下没有国家数据。")
+                st.warning(EMPTY_FILTER_MESSAGE)
             else:
                 left, right = st.columns(2)
                 left.plotly_chart(
@@ -398,12 +450,12 @@ def main():
 
     with product_tab:
         st.subheader("商品分析")
-        if filtered_transactions is None:
+        if not global_filters.transaction_available:
             st.info(f"无法展示商品分析：{transaction_error}")
         else:
-            products = summarize_filtered_products(filtered_transactions)
+            products = global_filters.filtered_product_summary
             if products.empty:
-                st.info("当前筛选条件下没有商品数据。")
+                st.warning(EMPTY_FILTER_MESSAGE)
             else:
                 top_n = st.selectbox(
                     "排行数量", [10, 20, 50], index=1, key="product_top_n"
@@ -438,34 +490,37 @@ def main():
 
     with cohort_tab:
         st.subheader("Cohort留存")
-        if transaction_bundle is None:
+        if not global_filters.transaction_available:
             st.info(f"无法展示Cohort留存：{transaction_error}")
         else:
-            retention = transaction_bundle.cohort_retention
-            heatmap = retention.pivot(
-                index="CohortMonth", columns="Period", values="RetentionRate"
-            )
-            st.plotly_chart(
-                px.imshow(
-                    heatmap,
-                    zmin=0,
-                    zmax=1,
-                    color_continuous_scale="Blues",
-                    aspect="auto",
-                    text_auto=".0%",
-                    labels={"x": "Period", "y": "CohortMonth", "color": "留存率"},
-                    title="月度客户留存率",
-                ),
-                width="stretch",
-            )
-            st.caption(
-                "热力图直接读取 cohort_retention.csv；缺失期保持为空，不补0，也不根据交易筛选重新计算。"
-            )
+            retention = global_filters.filtered_cohort
+            if retention.empty:
+                st.warning(EMPTY_FILTER_MESSAGE)
+            else:
+                heatmap = retention.pivot(
+                    index="CohortMonth", columns="Period", values="RetentionRate"
+                )
+                st.plotly_chart(
+                    px.imshow(
+                        heatmap,
+                        zmin=0,
+                        zmax=1,
+                        color_continuous_scale="Blues",
+                        aspect="auto",
+                        text_auto=".0%",
+                        labels={"x": "Period", "y": "CohortMonth", "color": "留存率"},
+                        title="月度客户留存率（当前全局筛选）",
+                    ),
+                    width="stretch",
+                )
+                st.caption("Cohort仅针对当前筛选后的交易重新汇总展示，不修改完整run文件。")
 
     with transaction_tab:
         st.subheader("交易明细")
-        if filtered_transactions is None:
+        if not global_filters.transaction_available:
             st.info(f"无法展示交易明细：{transaction_error}")
+        elif filtered_transactions.empty:
+            st.warning(EMPTY_FILTER_MESSAGE)
         else:
             page_size = st.selectbox(
                 "每页行数", [50, 100, 200], index=1, key="transaction_page_size"
@@ -489,7 +544,7 @@ def main():
             )
             st.dataframe(page_frame, width="stretch", hide_index=True)
             st.download_button(
-                "下载完整筛选结果 CSV",
+                "下载当前筛选交易CSV",
                 dataframe_to_csv_bytes(filtered_transactions),
                 file_name=f"{bundle.run_id}_transactions_filtered.csv",
                 mime="text/csv",
@@ -498,7 +553,19 @@ def main():
 
     with rfm_tab:
         st.subheader("RFM客户与聚类")
-        rfm_kpis = compute_kpis(bundle.rfm_customers)
+        st.info(
+            "当前展示对象受全局筛选条件限制；RFM指标、会员分层和聚类结果基于当前完整run计算。"
+        )
+        if filtered_customers.empty:
+            st.warning(EMPTY_FILTER_MESSAGE)
+            rfm_kpis = {
+                "customers": 0,
+                "monetary": 0.0,
+                "average_frequency": 0.0,
+                "segments": 0,
+            }
+        else:
+            rfm_kpis = compute_kpis(filtered_customers)
         columns = st.columns(4)
         columns[0].metric("客户数", f"{rfm_kpis['customers']:,}")
         columns[1].metric("总 Monetary", f"£{rfm_kpis['monetary']:,.2f}")
@@ -518,11 +585,12 @@ def main():
                 key="download_filtered_rfm_customers",
             )
         with right:
-            summary = bundle.segment_summary
-            if selected_segments:
-                summary = summary[summary["Segment"].astype(str).isin(selected_segments)]
             st.markdown("##### 分层汇总")
-            st.dataframe(summary, width="stretch", hide_index=True)
+            st.dataframe(
+                global_filters.filtered_segment_summary,
+                width="stretch",
+                hide_index=True,
+            )
 
         chart_left, chart_right = st.columns(2)
         with chart_left:
@@ -571,6 +639,7 @@ def main():
             st.dataframe(bundle.algorithm_comparison, width="stretch", hide_index=True)
 
         st.markdown("#### 7张分析图片")
+        st.caption("以下图片和模型评估指标属于完整run静态产物，不会因展示筛选而重新训练或生成。")
         image_columns = st.columns(2)
         for index, image_path in enumerate(bundle.images):
             image_columns[index % 2].image(
@@ -578,11 +647,18 @@ def main():
             )
 
     with recommendations_tab:
-        render_recommendations(bundle)
+        render_recommendations(
+            bundle,
+            rfm_customers=global_filters.filtered_rfm_customers,
+            segment_summary=global_filters.filtered_segment_summary,
+            filtered_transactions=global_filters.filtered_transactions,
+            filter_summary=global_filters.active_filter_summary,
+        )
 
     with download_tab:
         st.subheader("下载中心")
-        st.markdown("##### RFM与聚类结果")
+        st.markdown("##### 完整run文件（不受全局筛选影响）")
+        st.caption("以下文件是当前run的原始导出，不会因页面筛选而改变。")
         rfm_downloads = [
             ("RFM客户", bundle.rfm_customers, "rfm_customers.csv"),
             ("分层汇总", bundle.segment_summary, "segment_summary.csv"),
@@ -619,6 +695,60 @@ def main():
                 )
         else:
             st.warning(f"交易分析导出不可用：{transaction_error}")
+
+        st.markdown("##### 当前全局筛选结果")
+        st.caption("以下CSV与各页面当前展示范围一致，不会写回或修改run文件。")
+        filtered_downloads = [
+            (
+                "筛选后RFM客户",
+                global_filters.filtered_rfm_customers,
+                "filtered_rfm_customers.csv",
+            ),
+            (
+                "筛选后分层汇总",
+                global_filters.filtered_segment_summary,
+                "filtered_segment_summary.csv",
+            ),
+        ]
+        if global_filters.transaction_available:
+            filtered_downloads.extend(
+                [
+                    (
+                        "筛选后交易",
+                        global_filters.filtered_transactions,
+                        "filtered_transactions.csv",
+                    ),
+                    (
+                        "筛选后月度汇总",
+                        global_filters.filtered_monthly_summary,
+                        "filtered_monthly_summary.csv",
+                    ),
+                    (
+                        "筛选后国家汇总",
+                        global_filters.filtered_country_summary,
+                        "filtered_country_summary.csv",
+                    ),
+                    (
+                        "筛选后商品汇总",
+                        global_filters.filtered_product_summary,
+                        "filtered_product_summary.csv",
+                    ),
+                    (
+                        "筛选后Cohort",
+                        global_filters.filtered_cohort,
+                        "filtered_cohort.csv",
+                    ),
+                ]
+            )
+        columns = st.columns(2)
+        for index, (label, frame, filename) in enumerate(filtered_downloads):
+            columns[index % 2].download_button(
+                f"下载{label}CSV",
+                dataframe_to_csv_bytes(frame),
+                file_name=f"{bundle.run_id}_{filename}",
+                mime="text/csv",
+                key=f"download_global_{filename}",
+            )
 
         st.markdown("##### 运行元数据")
         st.json(bundle.metadata)

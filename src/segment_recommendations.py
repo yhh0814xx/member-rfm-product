@@ -44,6 +44,26 @@ PRIORITY_RANKS = {
     "低": 1,
 }
 
+HIGH_PRIORITY_LEVELS = frozenset({"最高", "高"})
+
+TASK_COLORS = {
+    "重点维护": "#2563EB",
+    "成长培育": "#16A34A",
+    "流失挽回": "#EA580C",
+    "低成本唤醒": "#7C3AED",
+}
+
+
+def rank_priority_actions(recommendations, top_n: int = 3):
+    """Return the top actionable segments using the agreed business order."""
+    existing = recommendations[recommendations["SegmentExists"]].copy()
+    if existing.empty:
+        return existing.head(0)
+    return existing.sort_values(
+        ["PriorityRank", "MonetaryShare", "CustomerCount"],
+        ascending=False,
+    ).head(top_n)
+
 REQUIRED_FIELDS = (
     "Segment",
     "ChineseName",

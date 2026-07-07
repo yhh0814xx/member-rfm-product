@@ -3,7 +3,7 @@
 > **Language:** English | [Deutsch](README.de.md)
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-125%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/badge/tests-153%20passed-brightgreen.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![Coverage](https://raw.githubusercontent.com/leelesemann-sys/rfm-customer-segmentation/main/.github/badges/coverage.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![CI](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml/badge.svg)](https://github.com/leelesemann-sys/rfm-customer-segmentation/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -31,7 +31,7 @@ Most RFM analyses on this dataset stop at K-Means with default settings. This pr
 2. **Preprocessing comparison** — log-transform vs Yeo-Johnson power transform
 3. **Statistical validation** — Hopkins statistic (0.956) proves data is clusterable *before* running algorithms
 4. **Production-ready code** — Reusable `RFMPipeline` class, not just a notebook
-5. **Tested and automated** — 125 tests, including run-scoped dashboard and member-operation recommendations
+5. **Tested and automated** — 153 tests, including run-scoped dashboard, unified filters and member-operation recommendations
 6. **Iterative development** — [v1.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v1.0) baseline, then [v2.0](https://github.com/leelesemann-sys/rfm-customer-segmentation/releases/tag/v2.0) with multi-algorithm comparison via [documented PR](https://github.com/leelesemann-sys/rfm-customer-segmentation/pull/1)
 
 ---
@@ -75,6 +75,11 @@ RFM、修改分层规则，也不依赖参考项目、模拟数据或其他虚�
 10类可展开建议、目标客户筛选，以及分层建议和客户名单CSV下载。策略文案来自
 `config/segment_recommendations_zh.json`；页面不改变流水线输出文件，也不假设货币单位或
 生成项目不存在的CLV指标。
+
+左侧“全局展示筛选”以交易日期、国家、商品和查询条件确定候选客户，再叠加RFM
+Segment和CustomerID条件，并将最终客户集合反向应用到交易、趋势、国家、商品、
+Cohort、RFM、运营建议和筛选下载。多个维度采用AND逻辑。筛选只改变页面展示范围；
+RFM指标、会员分层、K-Means/GMM标签及完整run文件保持不变。
 
 ```powershell
 .venv\Scripts\python run_dashboard.py
@@ -200,7 +205,7 @@ Raw Data (541k rows)
 | Data | pandas, numpy |
 | ML | scikit-learn (K-Means, GMM, Hopkins, Yeo-Johnson) |
 | Visualization | matplotlib, seaborn |
-| Testing | pytest (125 tests) |
+| Testing | pytest (153 tests) |
 | CI/CD | GitHub Actions (Python 3.10, 3.11, 3.12) |
 
 ---
@@ -216,6 +221,7 @@ rfm-customer-segmentation/
 │   ├── segment_recommendations.py    # Ten-segment strategy validation
 │   └── recommendation_adapter.py     # RunBundle recommendation adapter
 ├── app/
+│   ├── global_filters.py             # Unified display-only filter pipeline
 │   └── recommendations_view.py       # Member-operation recommendation tab
 ├── config/
 │   └── segment_recommendations_zh.json
@@ -227,6 +233,7 @@ rfm-customer-segmentation/
 │   ├── test_pipeline.py               # 61 upstream unit tests
 │   ├── test_result_exporter.py        # Isolated directory and export tests
 │   ├── test_run_pipeline_outputs.py   # Full output-isolation integration test
+│   ├── test_global_filters.py
 │   ├── test_segment_recommendations.py
 │   ├── test_recommendation_adapter.py
 │   └── test_recommendations_view.py

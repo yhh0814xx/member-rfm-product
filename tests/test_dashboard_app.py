@@ -34,11 +34,11 @@ def test_dashboard_page_smoke(monkeypatch, tmp_path):
     assert len(run_selectors) == 1
     assert run_selectors[0].value == "smoke_run"
     assert len(titles) == 1
-    assert len(app.tabs) == 10
+    assert len(app.tabs) == 13
     assert any(tab.label == "数据上传与分析" for tab in app.tabs)
     assert any(tab.label == "会员运营建议" for tab in app.tabs)
-    assert len(app.metric) >= 13
-    assert any("筛选结果 4 条" in caption.value for caption in app.caption)
+    assert len(app.metric) >= 17
+    assert any("筛选结果 3 条" in caption.value for caption in app.caption)
 
     app.run()
     assert not app.exception
@@ -55,7 +55,7 @@ def test_dashboard_missing_transaction_tables_keeps_rfm_available(
 
     assert not app.exception
     assert any(metric.label == "客户数" for metric in app.metric)
-    assert any(metric.label == "run_id" for metric in app.metric)
+    assert any("会员运营工作台" in item.value for item in app.subheader)
     assert any("交易分析不可用" in warning.value for warning in app.warning)
 
 
@@ -79,6 +79,50 @@ def test_completed_upload_pending_run_is_selected(monkeypatch, tmp_path):
     selector = next(item for item in app.selectbox if item.label == "选择 run_id")
     assert selector.value == "uploaded_run"
     assert "_pending_run_id" not in app.session_state
+
+
+def test_country_filter_updates_transaction_rfm_and_recommendation_views(
+    monkeypatch, tmp_path
+):
+    make_run(tmp_path, "country_filter")
+    monkeypatch.setenv("RFM_RUNS_ROOT", str(tmp_path))
+    app = AppTest.from_file(str(APP_PATH), default_timeout=20).run()
+    country = next(item for item in app.multiselect if item.label == "国家")
+    country.set_value(["France"])
+    app.run()
+
+    assert not app.exception
+    assert any("筛选后交易：1" in item.value for item in app.caption)
+    assert any("筛选结果 1 条" in item.value for item in app.caption)
+    assert any("筛选结果：1 条" in item.value for item in app.caption)
+    assert any(
+        item.label == "当前筛选客户数" and item.value == "1"
+        for item in app.metric
+    )
+    targets = [
+        item.value
+        for item in app.dataframe
+        if "MessageEntry" in getattr(item.value, "columns", [])
+    ]
+    assert len(targets) == 1
+    assert targets[0]["Segment"].tolist() == ["At Risk"]
+
+
+def test_reset_global_filters_restores_complete_display_scope(monkeypatch, tmp_path):
+    make_run(tmp_path, "reset_filters")
+    monkeypatch.setenv("RFM_RUNS_ROOT", str(tmp_path))
+    app = AppTest.from_file(str(APP_PATH), default_timeout=20).run()
+    country = next(item for item in app.multiselect if item.label == "国家")
+    country.set_value(["France"])
+    app.run()
+    assert any("筛选后交易：1" in item.value for item in app.caption)
+
+    reset = next(item for item in app.button if item.label == "重置全部筛选")
+    reset.click()
+    app.run()
+    country = next(item for item in app.multiselect if item.label == "国家")
+    assert country.value == []
+    assert any("筛选后交易：3" in item.value for item in app.caption)
 
 
 def test_dashboard_main_repeated_call_renders_only_once(monkeypatch, tmp_path):
@@ -179,7 +223,7 @@ def test_run_dashboard_real_entry_has_page_without_streamlit_errors(
 
         app = AppTest.from_file(str(APP_PATH), default_timeout=30).run()
         assert not app.exception
-        assert len(app.tabs) == 10
+        assert len(app.tabs) == 13
         assert len(app.file_uploader) == 1
         app.run()
         assert not app.exception
